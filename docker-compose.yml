@@ -1,0 +1,64 @@
+version: "3.8"
+
+services:
+  backend:
+    build:
+      context: ./backend
+    container_name: doctoroil_api
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      DATABASE_URL: "postgresql+asyncpg://oiladmin2025:clmtdoctoroil6388@16.16.153.156:5432/doctoroil"
+    working_dir: /app 
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app  # backend 폴더 전체를 /app에 연결
+    restart: unless-stopped
+
+# version: "3.8"
+
+# services:
+#   # db:
+#   #   image: postgres:15
+#   #   restart: unless-stopped
+#   #   environment:
+#   #     POSTGRES_USER: doctoroil
+#   #     POSTGRES_PASSWORD: doctoroil_pass
+#   #     POSTGRES_DB: doctoroil_db
+#   #   volumes:
+#   #     - pgdata:/var/lib/postgresql/data
+#   #   ports:
+#   #     - "5432:5432"
+#   #   env_file:
+#   #     - .env
+#   environment:
+#     OPENAI_API_KEY: ${OPENAI_API_KEY}
+#     DATABASE_URL: "postgresql+asyncpg://oiladmin2025:clmtdoctoroil6388@doctor-oil-clmt-web.chqw6066a9di.eu-north-1.rds.amazonaws.com:5432/doctoroil"
+#   backend:
+#     build:
+#       context: ./backend
+#     # depends_on:
+#     #   - db
+#     # environment: 
+#     #   OPENAI_API_KEY: ${OPENAI_API_KEY}
+#     #   DATABASE_URL: "postgresql+asyncpg://doctoroil:doctoroil_pass@db:5432/doctoroil_db"
+#     container_name: doctoroil_api
+#     ports:
+#       - "8000:8000"
+#     volumes:
+#       - ./backend/app:/app
+#     working_dir: /
+#     # command: >
+#     #   sh -c "until pg_isready -h db -p 5432 -U doctoroil;
+#     #   do echo '⏳ Waiting for database...'; sleep 2; done;
+#     #   echo '✅ Database is ready! Starting FastAPI...';
+#     #   uvicorn app.main:app --host 0.0.0.0 --port 8000"
+#     restart: unless-stopped
+#     env_file:
+#       - .env  
+
+# # volumes:
+# #   pgdata:

@@ -1,0 +1,28 @@
+<h2>분석 결과</h2>
+
+<div class="col-md-6">
+      <a href="/static/index.html" class="btn btn-secondary ms-2">입력 페이지</a>
+      <a href="/static/list.html" class="btn btn-secondary ms-2">목록</a>
+</div>
+
+<div id="result"></div>
+
+<script>
+
+function goIndex() {
+  window.location.href = "/";
+}
+
+function goList() {
+  window.location.href = "/api/readings";
+}
+
+const readingId = location.pathname.split("/").pop();
+
+fetch(`/api/analysis/${readingId}`)
+  .then(res => res.json())
+  .then(data => {
+    document.getElementById("result").innerHTML =
+      `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+  });
+</script>

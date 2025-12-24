@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <title>폐오일 기록 관리</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+
+<body class="bg-light">
+<div class="container py-4">
+  <h1 class="mb-4">폐오일 기록 관리</h1>
+
+  <div class="row g-3 align-items-end">
+    <div class="col-md-3">
+      <label class="form-label">조회 날짜</label>
+      <input type="date" id="datePicker" class="form-control">
+    </div>
+    <div class="col-md-6">
+      <button id="searchByDateBtn" class="btn btn-primary">날짜별 조회</button>
+      <button id="searchAllBtn" class="btn btn-outline-primary ms-2">전체 조회</button>
+      <a href="/static/index.html" class="btn btn-secondary ms-2">입력 페이지</a>
+    </div>
+  </div>
+
+  <div id="results" class="mt-4"></div>
+</div>
+
+<style>
+.edit-icon {
+  cursor: pointer;
+  font-size: 14px;
+}
+.editing input {
+  width: 100%;
+  font-size: 0.8rem;
+}
+</style>
+
+<script>
+/* 🔧 테이블 행 렌더링 */
+function readingRow(r) {
+  let btnHtml = "";
+
+  if (r.has_analysis) {
+    btnHtml = `
+      <button class="btn btn-sm btn-primary me-1"
+        onclick="location.href='/analysis/${r.id}'">
+        분석결과확인
+      </button>
+      <button class="btn btn-sm btn-warning"
+        id="analyze-btn-${r.id}"
+        onclick='handleAnalyze("${r.id}")'>
+        재분석
+      </button>
+    `;
+  } else {
+    btnHtml = `
+      <button class="btn btn-sm btn-success"
+        id="analyze-btn-${r.id}"
+        onclick='handleAnalyze("${r.id}", ${JSON.stringify(r)})'>
+        분석하기
+      </button>
+    `;
+  }
+
+  return `
+    <tr data-id="${r.id}">
+      <td>
+        <span class="edit-icon" onclick="enableEdit(this)">✏️</span>
+      </td>
+      <td>${r.id}</td>
+      <td>${r.oil_Model}</td>
+      <td>${new Date(r.timestamp).toLocaleString()}</td>
+      <td>${r.viscosity ?? ''}</td>
+      <td>${r.tbn ?? ''}</td>
+      <td>${r.acid_number ?? ''}</td>
+      <td>${r.wear_fe ?? ''}</td>
+      <td>${r.wear_cu ?? ''}</td>
+      <td>${r.wear_al ?? ''}</td>
+      <td>${r.fuel_dilution ?? ''}</td>
+      <td>${r.soot ?? ''}</td>
+      <td>${r.mileage ?? ''}</td>
+      <td>${r.notes ?? ''}</td>
+      <td>${btnHtml}</td>
+    </tr>
+  `;
+}
+
+function enableEdit(icon) {
+  const tr = icon.closest("tr");
+  if (tr.classList.contains("editing")) return;
+
+  tr.classList.add("editing");
+
+  [...tr.children].forEach((td, idx) => {
+    if (idx < 2 || idx === tr.children.length - 1) return;
+
+    const value = td.innerText;
+    td.innerHTML = `<input value="${value}" />`;
+  });
+
+  tr.querySelectorAll("input").forEach(input => {
+    input.addEventListener("keydown", e => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        saveEdit(tr);
+      }
+    });
+  });
+}
+
+async function saveEdit(tr) {
+  const tds = tr.children;
+  const readingId = tr.dataset.id;
+
+    const payload = {
+    oil_Model: tds[2].querySelector("input")?.value || null,
+    viscosity: parseFloat(tds[4].querySelector("input")?.value) || null,
+    tbn: parseFloat(tds[5].querySelector("input")?.value) || null,
+    acid_number: parseFloat(tds[6].querySelector("input")?.value) || null,
+    wear_fe: parseFloat(tds[7].querySelector("input")?.value) || null,
+    wear_cu: parseFloat(tds[8].querySelector("input")?.value) || null,
+    wear_al: parseFloat(tds[9].querySelector("input")?.value) || null,
+    fuel_dilution: parseFloat(tds[10].querySelector("input")?.value) || null,
+    soot: parseFloat(tds[11].querySelector("input")?.value) || null,
+    mileage: parseInt(tds[12].querySelector("input")?.value) || null,
+    notes: tds[13].querySelector("input")?.value || null
+  };
+
+  const res = await fetch(`/api/readings/${readingId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+
+  if (!res.ok) {
+    alert("수정 실패");
+    return;
+  }
+
+  document.getElementById("searchAllBtn").click();
+}
+
+/* 🔧 테이블 출력 */
+function renderTable(items) {
+  if (items.length === 0) {
+    document.getElementById('results').innerHTML =
+      '<div class="alert alert-info">기록이 없습니다.</div>';
+    return;
+  }
+
+  const html = `
+    <table class="table table-striped table-sm">
+      <thead>
+        <tr>
+          <th></th><th>ID</th><th>oil Model</th><th>시간</th><th>점도</th><th>TBN</th><th>AN</th>
+          <th>Fe</th><th>Cu</th><th>Al</th><th>FuelDil</th>
+          <th>Soot</th><th>Mileage</th><th>Notes</th><th>분석</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${items.map(r => readingRow(r)).join('')}
+      </tbody>
+    </table>
+  `;
+  document.getElementById('results').innerHTML = html;
+}
+
+/* 🔧 날짜별 조회 */
+document.getElementById('searchByDateBtn').addEventListener('click', async () => {
+  const d = document.getElementById('datePicker').value;
+  if (!d) {
+    alert('날짜를 선택하세요.');
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/readings/by-date?date=${d}`);
+    if (!res.ok) throw new Error('서버 오류');
+    renderTable(await res.json());
+  } catch (err) {
+    alert(err.message);
+  }
+});
+
+/* 🔧 전체 조회 */
+document.getElementById('searchAllBtn').addEventListener('click', async () => {
+  try {
+    const res = await fetch(`/api/readings/all`);
+    if (!res.ok) throw new Error('서버 오류');
+    renderTable(await res.json());
+  } catch (err) {
+    alert(err.message);
+  }
+});
+
+/* 🔧 분석 서버 전송 */
+async function sendToAnalysisServer(r) {
+  const payload = {
+    id: r.id,
+    oil_Model: r.oil_Model,
+    time: r.timestamp,
+    viscosity: r.viscosity,
+    tbn: r.tbn,
+    an: r.acid_number,
+    fe: r.wear_fe,
+    cu: r.wear_cu,
+    al: r.wear_al,
+    fuel_dilution: r.fuel_dilution,
+    soot: r.soot,
+    mileage: r.mileage,
+    notes: r.notes
+  };
+
+  try {
+    const res = await fetch(ANALYSIS_SERVER_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) throw new Error("분석 서버 전송 실패");
+    alert("분석 요청 성공");
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+/* 🔧 기본 날짜 = 오늘 */
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('datePicker').value =
+    new Date().toISOString().slice(0,10);
+});
+
+async function handleAnalyze(readingId) {
+  const btn = document.getElementById(`analyze-btn-${readingId}`);
+
+  // ✅ 이미 분석 완료 상태면 → 결과 페이지로 이동
+  if (btn.dataset.state === "done") {
+    window.location.href =
+      `/analysis/${readingId}`;
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerText = "분석 중...";
+
+  try {
+    // 🔥 최신 reading 다시 조회
+    const res = await fetch(`/api/readings/${readingId}`);
+    if (!res.ok) throw new Error("최신 데이터 조회 실패");
+
+    const r = await res.json();
+
+    const payload = {
+      id: r.id,
+      oil_Model:r.oil_Model,
+      time: r.timestamp,
+      viscosity: r.viscosity,
+      tbn: r.tbn,
+      an: r.acid_number,
+      fe: r.wear_fe,
+      cu: r.wear_cu,
+      al: r.wear_al,
+      fuel_dilution: r.fuel_dilution,
+      soot: r.soot,
+      mileage: r.mileage,
+      notes: r.notes
+    };
+
+    const analyzeRes = await fetch(
+      `/analyze/api/analyze?reading_id=${readingId}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      }
+    );
+
+    if (!analyzeRes.ok) throw new Error("분석 실패");
+
+    // ✅ 분석 완료 상태로 전환
+    btn.innerText = "분석결과확인";
+    btn.dataset.state = "done";
+
+  } catch (err) {
+    alert(err.message);
+    btn.innerText = "재분석";
+    btn.dataset.state = "idle";
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+</script>
+</body>
+</html>
